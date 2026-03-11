@@ -1,0 +1,24 @@
+{
+  "name": "google-reviews-monitor-server",
+  "version": "1.0.0",
+  "description": "Backend para monitoreo de reseñas de Google Maps",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.7",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dayjs": "^1.11.10",
+    "dotenv": "^16.4.2",
+    "express": "^4.18.2",
+    "helmet": "^8.1.0",
+    "mongoose": "^8.1.2",
+    "socket.io": "^4.7.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}
