@@ -3,7 +3,10 @@ import { io } from 'socket.io-client';
 
 const SocketContext = createContext(null);
 
-const SOCKET_URL = 'http://localhost:3002';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL
+  || (import.meta.env.DEV
+    ? 'http://localhost:3002'
+    : window.location.origin);
 
 /**
  * Proveedor de Socket.IO para toda la aplicación.
@@ -17,6 +20,7 @@ export function SocketProvider({ children }) {
 
   useEffect(() => {
     const socket = io(SOCKET_URL, {
+      path: '/socket.io',
       transports: ['websocket'],
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
