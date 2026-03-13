@@ -47,21 +47,27 @@ async function syncBusinessReviews(placeId) {
     const seenHashes = new Set();
 
     for (const googleReview of reviews) {
-      const hash = generateReviewHash(
+      const reviewTimestamp = googleReview.time
+        ? dayjs.unix(googleReview.time).toDate()
+        : null;
+      const stableHash = generateReviewHash(
+        googleReview.author_name,
+        googleReview.time || googleReview.relative_time_description || '',
+        googleReview.text
+      );
+      const legacyHash = generateReviewHash(
         googleReview.author_name,
         googleReview.relative_time_description,
         googleReview.text
       );
-      seenHashes.add(hash);
-
-      // Convertir unix timestamp de Google a Date
-      const reviewTimestamp = googleReview.time
-        ? dayjs.unix(googleReview.time).toDate()
-        : null;
+      seenHashes.add(stableHash);
       const isNegative = googleReview.rating <= 2;
 
       // Verificar si ya existe en la BD para este negocio
-      const existing = await Review.findOne({ placeId, reviewHash: hash });
+      const existing = await Review.findOne({
+        placeId,
+        reviewHash: { $in: Array.from(new Set([stableHash, legacyHash])) },
+      });
 
       if (!existing) {
         const newReview = await Review.create({
@@ -73,7 +79,7 @@ async function syncBusinessReviews(placeId) {
           relativeTimeDescription: googleReview.relative_time_description || null,
           reviewTimestamp,
           language: googleReview.language || null,
-          reviewHash: hash,
+          reviewHash: stableHash,
           isNew: true,
           isNegative,
           syncedAt: syncStartedAt,
@@ -114,6 +120,7 @@ async function syncBusinessReviews(placeId) {
       existing.relativeTimeDescription = googleReview.relative_time_description || null;
       existing.reviewTimestamp = reviewTimestamp;
       existing.language = googleReview.language || null;
+      existing.reviewHash = stableHash;
       existing.isNegative = isNegative;
       existing.status = 'active';
       existing.syncedAt = syncStartedAt;

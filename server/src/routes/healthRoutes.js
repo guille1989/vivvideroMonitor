@@ -11,12 +11,16 @@ router.get('/', (_req, res) => {
     2: 'connecting',
     3: 'disconnecting',
   }[dbState] || 'unknown';
+  const syncIntervalMs = parseInt(process.env.SYNC_INTERVAL_MS, 10) || 60000;
+  const trustpilotSyncIntervalMs = parseInt(process.env.TRUSTPILOT_SYNC_INTERVAL_MS, 10) || syncIntervalMs;
 
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     database: dbStatus,
     uptime: Math.floor(process.uptime()),
+    syncIntervalMs,
+    trustpilotSyncIntervalMs,
   });
 });
 

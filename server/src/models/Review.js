@@ -1,9 +1,11 @@
 const mongoose = require('mongoose');
 
+const TRACKING_STATUSES = ['unmanaged', 'managed', 'in_follow_up', 'ignored', 'escalated'];
+
 /**
  * Modelo Review
- * Almacena cada reseña obtenida de Google Places API.
- * reviewHash garantiza deduplicación cuando no hay reviewId.
+ * Almacena cada resena obtenida de Google Places API o Trustpilot.
+ * reviewHash garantiza deduplicacion cuando no hay reviewId.
  */
 const reviewSchema = new mongoose.Schema(
   {
@@ -42,40 +44,75 @@ const reviewSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
-    // Hash único: author + fecha + texto (para deduplicación)
+    // Hash unico: author + fecha + texto (para deduplicacion)
     reviewHash: {
       type: String,
       required: true,
       unique: true,
     },
-    // Marcador de reseña recién detectada
+    // Marcador de resena recien detectada
     isNew: {
       type: Boolean,
       default: true,
     },
-    // Reseña negativa (rating <= 2)
+    // Resena negativa (rating <= 2)
     isNegative: {
       type: Boolean,
       default: false,
     },
-    // Cuándo fue guardada/sincronizada
+    // Cuando fue guardada/sincronizada
     syncedAt: {
       type: Date,
       default: Date.now,
     },
-    // Estado de la reseña con respecto a la última visibilidad en Google
+    // Estado operativo interno para seguimiento manual
+    trackingStatus: {
+      type: String,
+      enum: TRACKING_STATUSES,
+      default: 'unmanaged',
+      index: true,
+    },
+    // Ultima nota interna registrada por el equipo
+    trackingNote: {
+      type: String,
+      default: '',
+      maxlength: 1500,
+    },
+    trackingUpdatedAt: {
+      type: Date,
+      default: null,
+    },
+    trackingHistory: [
+      {
+        status: {
+          type: String,
+          enum: TRACKING_STATUSES,
+          required: true,
+        },
+        note: {
+          type: String,
+          default: '',
+          maxlength: 1500,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+    // Estado de la resena con respecto a la ultima visibilidad en la fuente
     status: {
       type: String,
       enum: ['active', 'removed'],
       default: 'active',
       index: true,
     },
-    // Última vez que la reseña apareció en la respuesta de Google Places
+    // Ultima vez que la resena aparecio en la respuesta de la fuente
     lastSeenAt: {
       type: Date,
       default: Date.now,
     },
-    // Primera vez que dejó de verse en Google durante los ciclos de sync
+    // Primera vez que dejo de verse durante los ciclos de sync
     missingSince: {
       type: Date,
       default: null,
@@ -92,11 +129,15 @@ const reviewSchema = new mongoose.Schema(
   }
 );
 
-// Índice compuesto para consultas frecuentes
+// Indices compuestos para consultas frecuentes
 reviewSchema.index({ placeId: 1, rating: 1 });
 reviewSchema.index({ placeId: 1, isNew: 1 });
 reviewSchema.index({ placeId: 1, isNegative: 1 });
 reviewSchema.index({ placeId: 1, syncedAt: -1 });
 reviewSchema.index({ placeId: 1, status: 1 });
+reviewSchema.index({ placeId: 1, trackingStatus: 1 });
 
-module.exports = mongoose.model('Review', reviewSchema);
+const Review = mongoose.model('Review', reviewSchema);
+
+module.exports = Review;
+module.exports.TRACKING_STATUSES = TRACKING_STATUSES;

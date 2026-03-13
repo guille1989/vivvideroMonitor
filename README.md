@@ -69,7 +69,7 @@ cp .env.example .env
 Edita `server/.env` con tus valores:
 
 ```env
-PORT=3001
+PORT=3002
 MONGODB_URI=mongodb://localhost:27017/google-reviews-monitor
 GOOGLE_PLACES_API_KEY=AIzaSy...TU_KEY_AQUI
 PLACE_ID=ChIJgdfWKLaaP44R59EHzMeJdX0
@@ -86,7 +86,7 @@ npm install
 npm run dev
 ```
 
-El servidor estará en: `http://localhost:3001`
+El servidor estará en: `http://localhost:3002`
 
 ### 3. Configurar el frontend
 

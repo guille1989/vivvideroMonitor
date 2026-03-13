@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 
 const SocketContext = createContext(null);
 
-const SOCKET_URL = 'http://localhost:3001';
+const SOCKET_URL = 'http://localhost:3002';
 
 /**
  * Proveedor de Socket.IO para toda la aplicación.
@@ -13,6 +13,7 @@ export function SocketProvider({ children }) {
   const socketRef = useRef(null);
   const [connected, setConnected] = useState(false);
   const [syncStatus, setSyncStatus] = useState('idle'); // idle | syncing | ok | error
+  const [lastSyncStartedAt, setLastSyncStartedAt] = useState(null);
 
   useEffect(() => {
     const socket = io(SOCKET_URL, {
@@ -33,7 +34,10 @@ export function SocketProvider({ children }) {
       console.log('🔌 Socket desconectado');
     });
 
-    socket.on('sync:started', () => setSyncStatus('syncing'));
+    socket.on('sync:started', ({ startedAt } = {}) => {
+      setSyncStatus('syncing');
+      setLastSyncStartedAt(startedAt || new Date().toISOString());
+    });
     socket.on('sync:finished', () => setSyncStatus('ok'));
     socket.on('sync:error', () => setSyncStatus('error'));
 
@@ -43,7 +47,7 @@ export function SocketProvider({ children }) {
   }, []);
 
   return (
-    <SocketContext.Provider value={{ socket: socketRef.current, connected, syncStatus }}>
+    <SocketContext.Provider value={{ socket: socketRef.current, connected, syncStatus, lastSyncStartedAt }}>
       {children}
     </SocketContext.Provider>
   );

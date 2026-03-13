@@ -2,12 +2,12 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/es';
 import { StarRating } from './ui/StarRating';
+import ReviewAvatar from './ReviewAvatar';
 
 dayjs.extend(relativeTime);
 dayjs.locale('es');
 
 export function ReviewCard({ review }) {
-  const initial = review.authorName?.charAt(0)?.toUpperCase() || '?';
   const colors = ['from-brand-500 to-brand-300', 'from-purple-500 to-pink-400', 'from-amber-500 to-yellow-300'];
   const colorIdx = review.authorName?.charCodeAt(0) % colors.length;
 
@@ -22,13 +22,12 @@ export function ReviewCard({ review }) {
         }`}
     >
       {/* Avatar */}
-      <div className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center
-        font-bold text-sm text-white bg-gradient-to-br ${colors[colorIdx]}`}>
-        {review.authorPhotoUrl
-          ? <img src={review.authorPhotoUrl} alt={initial} className="w-9 h-9 rounded-full object-cover" />
-          : initial
-        }
-      </div>
+      <ReviewAvatar
+        authorName={review.authorName}
+        authorPhotoUrl={review.authorPhotoUrl}
+        containerClassName={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-sm text-white bg-gradient-to-br ${colors[colorIdx]}`}
+        imageClassName="w-9 h-9 rounded-full object-cover"
+      />
 
       {/* Content */}
       <div className="flex-1 min-w-0">

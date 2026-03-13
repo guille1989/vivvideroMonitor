@@ -1,6 +1,6 @@
 const Review = require('../models/Review');
 const BusinessSnapshot = require('../models/BusinessSnapshot');
-const { syncBusinessReviews } = require('../services/syncService');
+const { getTrustpilotPlaceId, syncTrustpilotReviews } = require('../services/trustpilotSyncService');
 const logger = require('../utils/logger');
 
 const TRACKING_STATUSES = Review.TRACKING_STATUSES || ['unmanaged', 'managed', 'in_follow_up', 'ignored', 'escalated'];
@@ -31,18 +31,19 @@ async function getTrackingCounts(placeId) {
 }
 
 /**
- * GET /api/business/:placeId/summary
- * Retorna el snapshot actual del negocio.
+ * GET /api/trustpilot/summary
+ * Retorna resumen del negocio Trustpilot.
  */
-async function getSummary(req, res) {
+async function getTrustpilotSummary(req, res) {
   try {
-    const { placeId } = req.params;
+    const placeId = getTrustpilotPlaceId();
     const snapshot = await BusinessSnapshot.findOne({ placeId });
 
     if (!snapshot) {
-      return res.status(404).json({ error: 'Negocio no encontrado. Ejecuta una sincronización primero.' });
+      return res.status(404).json({ error: 'Trustpilot data unavailable — run a sync first' });
     }
 
+    const totalInDB = await Review.countDocuments({ placeId, status: { $ne: 'removed' } });
     const newCount = await Review.countDocuments({ placeId, isNew: true, status: { $ne: 'removed' } });
     const negativeCount = await Review.countDocuments({ placeId, isNegative: true, status: { $ne: 'removed' } });
     const removedCount = await Review.countDocuments({ placeId, status: 'removed' });
@@ -53,34 +54,27 @@ async function getSummary(req, res) {
       businessName: snapshot.businessName,
       currentRating: snapshot.currentRating,
       totalReviews: snapshot.totalReviews,
+      totalInDB,
       lastSyncedAt: snapshot.lastSyncedAt,
       newReviewsCount: newCount,
       negativeReviewsCount: negativeCount,
+      negativeCount,
       removedReviewsCount: removedCount,
       trackingCounts,
     });
   } catch (error) {
-    logger.error(`getSummary error: ${error.message}`);
+    logger.error(`getTrustpilotSummary error: ${error.message}`);
     res.status(500).json({ error: error.message });
   }
 }
 
 /**
- * GET /api/business/:placeId/reviews
- * Lista reviews con filtros opcionales:
- *   ?rating=5  (1-5)
- *   ?onlyNew=true
- *   ?onlyNegative=true
- *   ?includeRemoved=true
- *   ?onlyRemoved=true
- *   ?trackingStatus=managed
- *   ?search=texto
- *   ?from=2024-01-01&to=2024-12-31
- *   ?page=1&limit=20
+ * GET /api/trustpilot/reviews
+ * Lista reviews de Trustpilot con filtros opcionales.
  */
-async function getReviews(req, res) {
+async function getTrustpilotReviews(req, res) {
   try {
-    const { placeId } = req.params;
+    const placeId = getTrustpilotPlaceId();
     const {
       rating,
       onlyNew,
@@ -142,28 +136,26 @@ async function getReviews(req, res) {
       reviews,
     });
   } catch (error) {
-    logger.error(`getReviews error: ${error.message}`);
+    logger.error(`getTrustpilotReviews error: ${error.message}`);
     res.status(500).json({ error: error.message });
   }
 }
 
 /**
- * GET /api/business/:placeId/metrics
+ * GET /api/trustpilot/metrics
  * Retorna distribución por estrellas, historial de ratings y conteo de negativas.
  */
-async function getMetrics(req, res) {
+async function getTrustpilotMetrics(req, res) {
   try {
-    const { placeId } = req.params;
+    const placeId = getTrustpilotPlaceId();
     const activeFilter = { placeId, status: { $ne: 'removed' } };
 
-    // Distribución por estrellas
     const starDistribution = await Review.aggregate([
       { $match: activeFilter },
       { $group: { _id: '$rating', count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]);
 
-    // Reviews detectadas por día (últimos 30 días)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -180,10 +172,7 @@ async function getMetrics(req, res) {
       { $sort: { _id: 1 } },
     ]);
 
-    // Conteo de negativas
     const negativeCount = await Review.countDocuments({ ...activeFilter, isNegative: true });
-
-    // Historial de rating del snapshot
     const snapshot = await BusinessSnapshot.findOne({ placeId }, 'ratingHistory');
 
     res.json({
@@ -199,24 +188,28 @@ async function getMetrics(req, res) {
       ratingHistory: snapshot?.ratingHistory?.slice(-30) || [],
     });
   } catch (error) {
-    logger.error(`getMetrics error: ${error.message}`);
+    logger.error(`getTrustpilotMetrics error: ${error.message}`);
     res.status(500).json({ error: error.message });
   }
 }
 
 /**
- * POST /api/business/:placeId/sync
- * Dispara una sincronización manual.
+ * POST /api/trustpilot/sync
+ * Dispara sincronización manual de Trustpilot.
  */
-async function triggerSync(req, res) {
+async function triggerTrustpilotSync(req, res) {
   try {
-    const { placeId } = req.params;
-    const result = await syncBusinessReviews(placeId);
+    const result = await syncTrustpilotReviews();
     res.json({ success: true, ...result });
   } catch (error) {
-    logger.error(`triggerSync error: ${error.message}`);
+    logger.error(`triggerTrustpilotSync error: ${error.message}`);
     res.status(500).json({ error: error.message });
   }
 }
 
-module.exports = { getSummary, getReviews, getMetrics, triggerSync };
+module.exports = {
+  getTrustpilotSummary,
+  getTrustpilotReviews,
+  getTrustpilotMetrics,
+  triggerTrustpilotSync,
+};

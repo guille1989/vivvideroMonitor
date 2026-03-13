@@ -2,7 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const businessRoutes = require('./routes/businessRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
+const trustpilotRoutes = require('./routes/trustpilotRoutes');
 const healthRoutes = require('./routes/healthRoutes');
+const mediaRoutes = require('./routes/mediaRoutes');
 
 const app = express();
 
@@ -13,7 +16,7 @@ const app = express();
 // ─── CORS ──────────────────────────────────────────────────────────────────
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   credentials: true,
 }));
 
@@ -30,6 +33,9 @@ app.use((req, _res, next) => {
 // ─── Rutas ──────────────────────────────────────────────────────────────────
 app.use('/api/health', healthRoutes);
 app.use('/api/business', businessRoutes);
+app.use('/api/reviews', reviewRoutes);
+app.use('/api/trustpilot', trustpilotRoutes);
+app.use('/api/media', mediaRoutes);
 
 // ─── 404 handler ───────────────────────────────────────────────────────────
 app.use((_req, res) => {

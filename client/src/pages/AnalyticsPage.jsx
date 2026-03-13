@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import { BarChart3, AlertTriangle } from 'lucide-react';
-import { fetchMetrics } from '../services/api';
+import { fetchMetrics, fetchTrustpilotMetrics, fetchTrustpilotSummary } from '../services/api';
 
 const BRAND_COLORS = ['#448481', '#59b2b0', '#8cf4ee', '#c5efec', '#1f293d'];
 const STAR_COLORS = {
@@ -30,15 +31,32 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function AnalyticsPage({ placeId }) {
+  const [source, setSource] = useState('google');
+
   const metricsQuery = useQuery({
     queryKey: ['metrics', placeId],
     queryFn: () => fetchMetrics(placeId),
     refetchInterval: 60_000,
   });
 
-  const metrics = metricsQuery.data;
+  const tpMetricsQuery = useQuery({
+    queryKey: ['tp-metrics'],
+    queryFn: fetchTrustpilotMetrics,
+    refetchInterval: 60_000,
+    retry: 1,
+  });
 
-  if (metricsQuery.isError) {
+  const tpSummaryQuery = useQuery({
+    queryKey: ['tp-summary'],
+    queryFn: fetchTrustpilotSummary,
+    refetchInterval: 60_000,
+    retry: 1,
+  });
+
+  const isGoogleSource = source === 'google';
+  const selectedMetrics = isGoogleSource ? metricsQuery.data : tpMetricsQuery.data;
+
+  if (isGoogleSource && metricsQuery.isError) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
         <AlertTriangle size={40} className="text-red-400" />
@@ -48,7 +66,7 @@ export default function AnalyticsPage({ placeId }) {
     );
   }
 
-  if (metricsQuery.isLoading) {
+  if (isGoogleSource && metricsQuery.isLoading) {
     return (
       <div className="flex items-center justify-center py-24 text-gray-500 text-sm">
         Cargando métricas…
@@ -58,34 +76,83 @@ export default function AnalyticsPage({ placeId }) {
 
   // Preparar datos de distribución por estrella
   const starData = [1, 2, 3, 4, 5].map((s) => {
-    const found = metrics?.starDistribution?.find((d) => d.stars === s);
+    const found = selectedMetrics?.starDistribution?.find((d) => d.stars === s);
     return { stars: `${s}★`, count: found?.count || 0, fill: STAR_COLORS[s] };
   });
 
   // Total de reviews en BD
-  const totalInDB = starData.reduce((a, b) => a + b.count, 0);
+  const totalInDBByDistribution = starData.reduce((a, b) => a + b.count, 0);
+  const trustpilotTotalInDB =
+    tpSummaryQuery.data?.totalInDB ??
+    tpSummaryQuery.data?.totalReviewsInDB ??
+    tpSummaryQuery.data?.totalReviews;
+  const totalInDB = isGoogleSource
+    ? totalInDBByDistribution
+    : (typeof trustpilotTotalInDB === 'number' ? trustpilotTotalInDB : totalInDBByDistribution);
+  const negativeCount = isGoogleSource
+    ? (selectedMetrics?.negativeCount ?? 0)
+    : (tpSummaryQuery.data?.negativeCount ?? selectedMetrics?.negativeCount ?? 0);
 
   // Rating history para línea
-  const ratingHistory = (metrics?.ratingHistory || []).map((r, i) => ({
+  const ratingHistory = (selectedMetrics?.ratingHistory || []).map((r, i) => ({
     idx: i + 1,
     rating: r.rating,
   }));
 
   // Reviews por día
-  const reviewsByDay = metrics?.reviewsByDay || [];
+  const reviewsByDay = selectedMetrics?.reviewsByDay || [];
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center gap-2 mb-2">
-        <BarChart3 size={18} className="text-brand-300" />
-        <h1 className="font-bold text-brand-50">Analítica de Reseñas</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+        <div className="flex items-center gap-2">
+          <BarChart3 size={18} className="text-brand-300" />
+          <h1 className="font-bold text-brand-50">Analítica de Reseñas</h1>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSource('google')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+              source === 'google'
+                ? 'bg-brand-300/20 text-brand-100 border-brand-300/30'
+                : 'bg-[#1a2235] border-[rgba(89,178,176,0.15)] text-gray-400 hover:border-brand-300/30'
+            }`}
+          >
+            Google
+          </button>
+          <button
+            onClick={() => setSource('trustpilot')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5 ${
+              source === 'trustpilot'
+                ? 'bg-brand-300/20 text-brand-100 border-brand-300/30'
+                : 'bg-[#1a2235] border-[rgba(89,178,176,0.15)] text-gray-400 hover:border-brand-300/30'
+            }`}
+          >
+            {source === 'trustpilot' && (
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 text-green-400" fill="currentColor" aria-hidden="true">
+                <path d="M12 1.7l3.09 6.26 6.91 1-5 4.87 1.18 6.89L12 17.77 5.82 20.72 7 13.83 2 8.96l6.91-1L12 1.7z" />
+              </svg>
+            )}
+            Trustpilot
+          </button>
+        </div>
       </div>
+
+      {source === 'trustpilot' && tpMetricsQuery.isLoading && (
+        <div className="text-xs text-gray-500">Cargando datos de Trustpilot…</div>
+      )}
+      {source === 'trustpilot' && tpMetricsQuery.isError && (
+        <div className="text-xs rounded-lg px-3 py-2 border border-amber-500/30 bg-amber-950/20 text-amber-200">
+          Trustpilot data unavailable — run a sync first
+        </div>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: 'Total en BD', value: totalInDB, color: 'text-brand-100' },
-          { label: 'Negativas (1-2★)', value: metrics?.negativeCount ?? 0, color: 'text-red-400' },
+          { label: 'Negativas (1-2★)', value: negativeCount, color: 'text-red-400' },
           { label: 'Variaciones rating', value: ratingHistory.length, color: 'text-yellow-400' },
         ].map(({ label, value, color }) => (
           <div key={label} className="card text-center">

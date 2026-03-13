@@ -5,7 +5,7 @@ const { connectDB } = require('./config/database');
 const { initSocket } = require('./socket/socketManager');
 const { startSyncJob } = require('./jobs/syncJob');
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002;
 
 async function bootstrap() {
   try {
